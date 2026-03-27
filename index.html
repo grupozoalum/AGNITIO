@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>AGNITIO — Reconocimiento Facial de Próxima Generación</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Onest:wght@300;400;500;600;700;900&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#050508;--surface:#0b0b12;--surface2:#0f0f1a;
+  --border:rgba(255,255,255,.06);--border-a:rgba(82,183,255,.18);
+  --text:#dde6f0;--muted:#566070;--muted2:#7a8a9a;
+  --accent:#52b7ff;--accent2:#00e5c3;--warn:#ff9f1c;--danger:#ff4f6a;
+  --oracle:#7c6fff;--home:#00e5c3;--vision:#ff9f1c;
+  --mono:'DM Mono',monospace;--sans:'Onest',sans-serif;
+  --nav-h:68px;
+}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);overflow-x:hidden;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border-a)}
+
+/* ── CANVAS ── */
+#cv{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.38}
+
+/* ── NAV ── */
+nav{position:fixed;top:0;left:0;right:0;height:var(--nav-h);display:flex;align-items:center;justify-content:space-between;padding:0 5%;z-index:300;border-bottom:1px solid transparent;transition:background .4s,border-color .4s,backdrop-filter .4s}
+nav.on{background:rgba(5,5,8,.85);backdrop-filter:blur(18px);border-color:var(--border)}
+.logo{display:flex;align-items:center;gap:.8rem;font-family:var(--mono);font-size:.95rem;font-weight:500;letter-spacing:.14em;color:var(--text);text-decoration:none}
+.lbox{width:34px;height:34px;border:1px solid var(--accent);position:relative;display:grid;place-items:center;overflow:hidden}
+.lbox-scan{position:absolute;top:-100%;left:0;width:100%;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:scan 2.6s ease-in-out infinite}
+.lbox span{font-size:.7rem;color:var(--accent);font-weight:500;position:relative;z-index:1}
+.lbeta{font-size:.55rem;color:var(--accent2);border:1px solid rgba(0,229,195,.25);padding:.15rem .4rem;letter-spacing:.14em}
+nav ul{list-style:none;display:flex;gap:1.8rem}
+nav ul a{font-family:var(--mono);font-size:.68rem;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:color .25s}
+nav ul a:hover{color:var(--accent)}
+.ncta{font-family:var(--mono);font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;text-decoration:none;color:var(--bg);background:var(--accent);padding:.48rem 1.2rem;transition:background .25s;display:inline-block}
+.ncta:hover{background:var(--accent2)}
+
+/* ── HERO ── */
+.hero{position:relative;min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:0 5%;padding-top:var(--nav-h);overflow:hidden}
+.hgrid{position:absolute;inset:0;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:56px 56px;mask-image:radial-gradient(ellipse 75% 75% at 50% 50%,black 20%,transparent 100%);opacity:.6}
+.hglow{position:absolute;top:-15%;left:-8%;width:65vw;height:65vw;background:radial-gradient(ellipse,rgba(82,183,255,.08) 0%,transparent 65%);pointer-events:none}
+.hglow2{position:absolute;bottom:-10%;right:-8%;width:45vw;height:45vw;background:radial-gradient(ellipse,rgba(0,229,195,.055) 0%,transparent 65%);pointer-events:none}
+
+.face-deco{position:absolute;right:5%;top:50%;transform:translateY(-50%);width:min(40vw,460px);height:min(40vw,460px);z-index:1;pointer-events:none;opacity:.35}
+.fd-ring{position:absolute;inset:0;border:1px solid var(--border-a);border-radius:50%;animation:ringPulse 3s ease-in-out infinite}
+.fd-ring:nth-child(2){inset:10%;animation-delay:.6s;border-color:rgba(0,229,195,.15)}
+.fd-ring:nth-child(3){inset:20%;animation-delay:1.2s;border-color:rgba(82,183,255,.1)}
+.fd-corner{position:absolute;width:18px;height:18px;border-color:var(--accent);border-style:solid}
+.fd-tl{top:5%;left:5%;border-width:2px 0 0 2px}
+.fd-tr{top:5%;right:5%;border-width:2px 2px 0 0}
+.fd-bl{bottom:5%;left:5%;border-width:0 0 2px 2px}
+.fd-br{bottom:5%;right:5%;border-width:0 2px 2px 0}
+.fd-hline{position:absolute;left:5%;right:5%;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:scanH 3s ease-in-out infinite}
+.fd-dot{position:absolute;width:4px;height:4px;border-radius:50%;background:var(--accent2)}
+.fd-dot:nth-child(6){top:38%;left:38%}.fd-dot:nth-child(7){top:38%;right:38%}.fd-dot:nth-child(8){top:48%;left:50%}
+.fd-label{position:absolute;bottom:-6%;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:.58rem;letter-spacing:.2em;color:var(--accent);white-space:nowrap}
+
+.hcontent{position:relative;z-index:2;max-width:680px}
+.hstatus{display:inline-flex;align-items:center;gap:.7rem;font-family:var(--mono);font-size:.62rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted2);border:1px solid var(--border);padding:.42rem .9rem;margin-bottom:2.2rem;opacity:0;animation:fadeUp .7s .1s forwards}
+.sdot{width:6px;height:6px;border-radius:50%;background:var(--accent2);animation:pulse 2s infinite}
+.hero h1{font-size:clamp(2.8rem,7vw,6.5rem);font-weight:900;line-height:.94;letter-spacing:-.03em;opacity:0;animation:fadeUp .8s .25s forwards}
+.h1-acc{color:transparent;-webkit-text-stroke:1.5px var(--accent);display:block}
+.hero-sub{font-size:clamp(.9rem,1.5vw,1.08rem);color:var(--muted2);line-height:1.85;max-width:500px;margin-top:1.8rem;opacity:0;animation:fadeUp .8s .4s forwards}
+.hactions{display:flex;align-items:center;gap:1.4rem;margin-top:2.5rem;opacity:0;animation:fadeUp .8s .55s forwards}
+.btn-p{font-family:var(--mono);font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;text-decoration:none;color:var(--bg);background:var(--accent);padding:.78rem 1.9rem;transition:background .25s,transform .2s;display:inline-block}
+.btn-p:hover{background:var(--accent2);transform:translateY(-2px)}
+.btn-o{font-family:var(--mono);font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;text-decoration:none;color:var(--accent);border:1px solid var(--border-a);padding:.78rem 1.9rem;transition:background .25s,border-color .25s;display:inline-block}
+.btn-o:hover{background:rgba(82,183,255,.06);border-color:var(--accent)}
+
+.hspecs{display:flex;gap:2.5rem;margin-top:3.5rem;padding-top:2rem;border-top:1px solid var(--border);opacity:0;animation:fadeUp .8s .7s forwards;flex-wrap:wrap}
+.spec-val{font-family:var(--mono);font-size:1.4rem;color:var(--accent);letter-spacing:-.01em}
+.spec-lbl{font-family:var(--mono);font-size:.58rem;letter-spacing:.17em;text-transform:uppercase;color:var(--muted);margin-top:.25rem}
+
+.hscroll{position:absolute;bottom:2rem;right:5%;font-family:var(--mono);font-size:.58rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);writing-mode:vertical-rl;display:flex;align-items:center;gap:.6rem;opacity:0;animation:fadeIn .8s 1.1s forwards}
+.hscroll::before{content:'';display:block;width:1px;height:46px;background:linear-gradient(to bottom,var(--accent),transparent)}
+
+/* ── SECTIONS ── */
+section{padding:8rem 5%;position:relative;z-index:1}
+.stag{font-family:var(--mono);font-size:.6rem;letter-spacing:.24em;text-transform:uppercase;color:var(--accent);display:flex;align-items:center;gap:.8rem;margin-bottom:1.4rem}
+.stag::before{content:'';display:block;width:22px;height:1px;background:var(--accent)}
+.snum{color:var(--muted);margin-right:.25rem}
+h2.sh{font-size:clamp(1.9rem,3.8vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-.025em}
+h2.sh em{font-style:normal;color:var(--accent)}
+h2.sh .strk{color:transparent;-webkit-text-stroke:1px var(--accent)}
+.sep{border:none;border-top:1px solid var(--border);margin:0}
+
+/* ── QUIÉNES ── */
+#quienes{display:grid;grid-template-columns:1.1fr 1fr;gap:5rem;align-items:center;border-top:1px solid var(--border)}
+.qt p{font-size:.95rem;color:var(--muted2);line-height:1.9;margin-top:1.5rem}
+.qt p strong{color:var(--text)}
+.qt-badge{display:inline-flex;align-items:center;gap:.6rem;font-family:var(--mono);font-size:.6rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted2);border:1px solid var(--border);padding:.5rem .9rem;margin-top:2rem}
+.qt-badge span{color:var(--accent2)}
+
+.timeline{display:flex;flex-direction:column;gap:0}
+.tl-item{display:flex;gap:1.5rem;padding:1.4rem 1.5rem;border:1px solid var(--border);border-bottom:none;position:relative;transition:background .3s}
+.tl-item:last-child{border-bottom:1px solid var(--border)}
+.tl-item:hover{background:rgba(82,183,255,.03)}
+.tl-year{font-family:var(--mono);font-size:.62rem;letter-spacing:.14em;color:var(--muted);flex-shrink:0;padding-top:.2rem;min-width:52px}
+.tl-body{}
+.tl-title{font-size:.9rem;font-weight:600;margin-bottom:.3rem}
+.tl-desc{font-size:.82rem;color:var(--muted2);line-height:1.7}
+.tl-dot{position:absolute;left:-1px;top:50%;transform:translateY(-50%);width:3px;height:60%;background:var(--accent);opacity:0;transition:opacity .3s}
+.tl-item:hover .tl-dot{opacity:1}
+
+/* ── QUÉ ES ── */
+#que-es{border-top:1px solid var(--border);background:var(--surface)}
+.qe-grid{display:grid;grid-template-columns:1fr 1fr;gap:5rem;align-items:center;margin-top:4rem}
+.qe-text p{font-size:.95rem;color:var(--muted2);line-height:1.9;margin-bottom:1.2rem}
+.qe-text p strong{color:var(--text)}
+.feat-list{display:flex;flex-direction:column;gap:.7rem;margin-top:1.5rem}
+.feat-item{display:flex;align-items:flex-start;gap:.9rem;padding:.9rem 1.1rem;border:1px solid var(--border);transition:border-color .3s,background .3s}
+.feat-item:hover{border-color:var(--border-a);background:rgba(82,183,255,.03)}
+.feat-ico{font-family:var(--mono);color:var(--accent2);font-size:.8rem;flex-shrink:0;margin-top:.05rem}
+.feat-txt strong{display:block;font-size:.88rem;margin-bottom:.2rem}
+.feat-txt span{font-size:.8rem;color:var(--muted2)}
+
+.hw-card{background:var(--bg);border:1px solid var(--border);padding:2rem}
+.hw-card::before{content:'// hardware.spec';display:block;font-family:var(--mono);font-size:.58rem;color:var(--muted);letter-spacing:.1em;border-bottom:1px solid var(--border);padding-bottom:.8rem;margin-bottom:1.4rem}
+.hw-row{display:flex;justify-content:space-between;align-items:center;padding:.6rem 0;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:.75rem}
+.hw-row:last-child{border-bottom:none}
+.hw-key{color:var(--muted)}.hw-val{color:var(--accent2)}
+.hw-badge{display:inline-block;font-family:var(--mono);font-size:.58rem;letter-spacing:.14em;text-transform:uppercase;background:rgba(0,229,195,.1);color:var(--accent2);border:1px solid rgba(0,229,195,.2);padding:.25rem .6rem;margin-top:1.5rem}
+
+/* ── MÓDULOS ── */
+#modulos{border-top:1px solid var(--border)}
+.mod-header{margin-bottom:4rem}
+.mod-header p{color:var(--muted2);line-height:1.8;margin-top:1rem;max-width:580px;font-size:.95rem}
+
+.mod-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border)}
+
+.mod-card{background:var(--bg);padding:2.5rem 2rem;position:relative;overflow:hidden;transition:background .3s}
+.mod-card:hover{background:var(--surface)}
+.mod-bar{position:absolute;top:0;left:0;right:0;height:3px;transition:opacity .3s}
+.mc-oracle .mod-bar{background:linear-gradient(90deg,var(--oracle),transparent)}
+.mc-home .mod-bar{background:linear-gradient(90deg,var(--home),transparent)}
+.mc-vision .mod-bar{background:linear-gradient(90deg,var(--vision),transparent)}
+
+.mod-tag{font-family:var(--mono);font-size:.58rem;letter-spacing:.2em;text-transform:uppercase;margin-bottom:2rem;display:inline-block;padding:.22rem .6rem;border:1px solid}
+.mc-oracle .mod-tag{color:var(--oracle);border-color:rgba(124,111,255,.25)}
+.mc-home .mod-tag{color:var(--home);border-color:rgba(0,229,195,.25)}
+.mc-vision .mod-tag{color:var(--vision);border-color:rgba(255,159,28,.25)}
+
+.mod-icon{width:48px;height:48px;margin-bottom:1.5rem}
+.mc-oracle .mod-icon{color:var(--oracle)}
+.mc-home .mod-icon{color:var(--home)}
+.mc-vision .mod-icon{color:var(--vision)}
+
+.mod-title{font-size:1.3rem;font-weight:700;letter-spacing:-.015em;margin-bottom:.6rem}
+.mod-subtitle{font-family:var(--mono);font-size:.65rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:1.2rem}
+.mod-body{font-size:.84rem;color:var(--muted2);line-height:1.8;margin-bottom:1.8rem}
+.mod-caps{display:flex;flex-direction:column;gap:.5rem}
+.mcap{display:flex;align-items:center;gap:.7rem;font-size:.8rem;color:var(--muted2)}
+.mcap::before{content:'→';font-family:var(--mono);font-size:.7rem;flex-shrink:0}
+.mc-oracle .mcap::before{color:var(--oracle)}
+.mc-home .mcap::before{color:var(--home)}
+.mc-vision .mcap::before{color:var(--vision)}
+
+/* ── PROBLEMA ── */
+#problema{border-top:1px solid var(--border);background:var(--surface)}
+.prob-grid{display:grid;grid-template-columns:1fr 1fr;gap:5rem;align-items:start}
+.prob-left h2{margin-bottom:1.5rem}
+.prob-left p{color:var(--muted2);line-height:1.9;font-size:.93rem;margin-bottom:1rem}
+.pain-list{margin-top:2rem;display:flex;flex-direction:column;gap:.7rem}
+.pain-item{display:flex;align-items:flex-start;gap:1rem;padding:.95rem 1.1rem;border:1px solid var(--border);background:var(--bg);transition:border-color .3s}
+.pain-item:hover{border-color:var(--danger)}
+.xico{color:var(--danger);font-family:var(--mono);font-size:.85rem;flex-shrink:0;margin-top:.08rem}
+.ptxt{font-size:.86rem;color:var(--muted2);line-height:1.7}.ptxt strong{color:var(--text)}
+.sol-block{border:1px solid var(--border-a);padding:1.8rem;background:rgba(82,183,255,.025);margin-bottom:.8rem;position:relative}
+.sol-block::before{content:'';position:absolute;top:0;left:0;width:2px;height:100%;background:linear-gradient(to bottom,var(--accent),var(--accent2))}
+.sol-lbl{font-family:var(--mono);font-size:.58rem;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);margin-bottom:.7rem}
+.sol-txt{font-size:.88rem;color:var(--muted2);line-height:1.8}.sol-txt strong{color:var(--text)}
+
+/* ══════════════════════════════════════
+   ── COMPETENCIA (REDISEÑADA) ──
+══════════════════════════════════════ */
+#competencia{border-top:1px solid var(--border)}
+
+.comp-header{max-width:700px;margin-bottom:4.5rem}
+.comp-header p{color:var(--muted2);line-height:1.8;margin-top:1rem;font-size:.93rem}
+
+/* ── Grupos de rivales ── */
+.comp-section-label{
+  font-family:var(--mono);font-size:.6rem;letter-spacing:.26em;text-transform:uppercase;
+  color:var(--muted);display:flex;align-items:center;gap:1rem;margin-bottom:1.6rem;
+}
+.comp-section-label::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* Tarjetas de competidores */
+.rival-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);margin-bottom:.8rem}
+.rival-grid.two-col{grid-template-columns:1fr 1fr}
+
+.rival-card{
+  background:var(--bg);padding:2rem 1.8rem;position:relative;overflow:hidden;
+  transition:background .35s;
+}
+.rival-card:hover{background:var(--surface2)}
+
+/* barra superior de color según origen */
+.rival-card .rbar{position:absolute;top:0;left:0;right:0;height:2px}
+.origin-cn .rbar{background:linear-gradient(90deg,#d4302f,transparent)}
+.origin-kr .rbar{background:linear-gradient(90deg,#3b82f6,transparent)}
+.origin-mx .rbar{background:linear-gradient(90deg,#16a34a,transparent)}
+.origin-us .rbar{background:linear-gradient(90deg,var(--warn),transparent)}
+
+/* encabezado de tarjeta */
+.rival-head{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:1.2rem}
+.rival-name{font-size:1.05rem;font-weight:700;letter-spacing:-.01em;line-height:1.2}
+.rival-origin{
+  font-family:var(--mono);font-size:.55rem;letter-spacing:.18em;text-transform:uppercase;
+  padding:.2rem .55rem;border:1px solid;flex-shrink:0;margin-top:.2rem;
+}
+.origin-cn .rival-origin{color:#d4302f;border-color:rgba(212,48,47,.25)}
+.origin-kr .rival-origin{color:#3b82f6;border-color:rgba(59,130,246,.25)}
+.origin-mx .rival-origin{color:#16a34a;border-color:rgba(22,163,74,.25)}
+.origin-us .rival-origin{color:var(--warn);border-color:rgba(255,159,28,.25)}
+
+.rival-tagline{
+  font-family:var(--mono);font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:.9rem;
+}
+.rival-desc{font-size:.82rem;color:var(--muted2);line-height:1.8;margin-bottom:1.4rem}
+
+/* puntos fuertes / débiles */
+.rival-attrs{display:flex;flex-direction:column;gap:.4rem}
+.rattr{display:flex;align-items:flex-start;gap:.6rem;font-size:.78rem;color:var(--muted2);line-height:1.5}
+.rattr-icon{flex-shrink:0;font-family:var(--mono);font-size:.72rem;margin-top:.05rem}
+.rattr.strong .rattr-icon{color:var(--accent2)}
+.rattr.weak   .rattr-icon{color:var(--danger)}
+.rattr.neutral .rattr-icon{color:var(--warn)}
+
+/* Tarjeta especial Nexus */
+.rival-card.nexus-card{background:rgba(22,163,74,.04);border-top:none}
+.nexus-badge{
+  display:inline-flex;align-items:center;gap:.5rem;
+  font-family:var(--mono);font-size:.55rem;letter-spacing:.18em;text-transform:uppercase;
+  background:rgba(22,163,74,.12);color:#4ade80;border:1px solid rgba(22,163,74,.25);
+  padding:.3rem .7rem;margin-bottom:1rem;
+}
+.nexus-badge::before{content:'';width:5px;height:5px;border-radius:50%;background:#4ade80;animation:pulse 2s infinite}
+
+/* Radar de posicionamiento AGNITIO */
+.agnitio-pos-card{
+  background:var(--surface);border:1px solid var(--border-a);padding:2.2rem 2rem;
+  margin-top:3.5rem;position:relative;overflow:hidden;
+}
+.agnitio-pos-card::before{
+  content:'// agnitio.positioning';font-family:var(--mono);font-size:.58rem;
+  color:var(--accent);letter-spacing:.1em;display:block;
+  border-bottom:1px solid var(--border);padding-bottom:.8rem;margin-bottom:1.8rem;
+}
+.pos-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--border)}
+.pos-col{background:var(--bg);padding:1.2rem 1rem;text-align:center}
+.pos-col-head{font-family:var(--mono);font-size:.58rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:1.2rem;line-height:1.5}
+.pos-dot{
+  width:28px;height:28px;border-radius:50%;margin:0 auto .5rem;display:grid;place-items:center;
+  font-family:var(--mono);font-size:.65rem;font-weight:500;
+}
+.pos-dot.full{background:rgba(0,229,195,.15);color:var(--accent2);border:1px solid rgba(0,229,195,.35)}
+.pos-dot.half{background:rgba(255,159,28,.1);color:var(--warn);border:1px solid rgba(255,159,28,.3)}
+.pos-dot.none{background:rgba(255,79,106,.08);color:var(--danger);border:1px solid rgba(255,79,106,.25)}
+.pos-row-label{font-family:var(--mono);font-size:.62rem;color:var(--muted2);letter-spacing:.08em}
+
+/* tabla clásica (mantenida debajo) */
+.tw{overflow-x:auto;margin-top:3.5rem}
+.tw-label{font-family:var(--mono);font-size:.6rem;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:1rem;margin-bottom:1.2rem}
+.tw-label::after{content:'';flex:1;height:1px;background:var(--border)}
+table.ct{width:100%;border-collapse:collapse;font-size:.83rem}
+table.ct th{font-family:var(--mono);font-size:.6rem;letter-spacing:.17em;text-transform:uppercase;color:var(--muted);padding:.9rem 1.3rem;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+table.ct th:first-child{color:var(--text)}
+table.ct td{padding:1rem 1.3rem;border-bottom:1px solid var(--border);color:var(--muted2);vertical-align:middle;line-height:1.5}
+table.ct td:first-child{font-weight:600;color:var(--text);font-size:.86rem}
+table.ct tr:hover td{background:rgba(82,183,255,.025)}
+table.ct tr.us td{background:rgba(82,183,255,.04);color:var(--text)}
+table.ct tr.us td:first-child{color:var(--accent)}
+.ck{color:var(--accent2);font-family:var(--mono)}.xx{color:var(--danger);font-family:var(--mono)}.pp{color:var(--warn);font-family:var(--mono)}
+
+/* ── VENTAJAS ── */
+#ventajas{border-top:1px solid var(--border);background:var(--surface)}
+.vt{display:grid;grid-template-columns:1fr 1fr;gap:4rem;align-items:start;margin-bottom:4.5rem}
+.vt p{color:var(--muted2);line-height:1.9;margin-top:1rem;font-size:.93rem}
+.adv-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--border)}
+.adv{background:var(--bg);padding:2rem 1.8rem;position:relative;transition:background .3s}
+.adv:hover{background:rgba(82,183,255,.025)}
+.adv-n{font-family:var(--mono);font-size:3rem;font-weight:300;color:rgba(82,183,255,.09);line-height:1;margin-bottom:.9rem;transition:color .3s}
+.adv:hover .adv-n{color:rgba(82,183,255,.18)}
+.adv-bar{position:absolute;top:0;left:0;width:100%;height:2px;background:linear-gradient(90deg,var(--accent),transparent);opacity:0;transition:opacity .3s}
+.adv:hover .adv-bar{opacity:1}
+.adv-t{font-size:1rem;font-weight:600;letter-spacing:-.01em;margin-bottom:.6rem}
+.adv-b{font-size:.83rem;color:var(--muted2);line-height:1.8}
+
+/* ── FOUNDER ── */
+#founder{border-top:1px solid var(--border)}
+.fnd-grid{display:grid;grid-template-columns:1fr 1fr;gap:5rem;align-items:center}
+.fnd-left h2{margin-bottom:1.5rem}
+.fnd-left p{font-size:.93rem;color:var(--muted2);line-height:1.9;margin-bottom:1rem}
+.fnd-left p strong{color:var(--text)}
+.fnd-tags{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1.5rem}
+.ftag{font-family:var(--mono);font-size:.58rem;letter-spacing:.13em;text-transform:uppercase;color:var(--muted2);border:1px solid var(--border);padding:.25rem .65rem}
+
+.fnd-card{background:var(--surface);border:1px solid var(--border);padding:2.2rem}
+.fnd-card::before{content:'// founder.profile';display:block;font-family:var(--mono);font-size:.58rem;color:var(--muted);letter-spacing:.1em;border-bottom:1px solid var(--border);padding-bottom:.8rem;margin-bottom:1.5rem}
+.fp-row{display:flex;justify-content:space-between;align-items:flex-start;padding:.7rem 0;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:.75rem}
+.fp-row:last-child{border-bottom:none}
+.fp-k{color:var(--muted);flex-shrink:0;min-width:120px}
+.fp-v{color:var(--text);text-align:right;font-size:.73rem;line-height:1.5}
+.fp-v .hi{color:var(--accent2)}
+.fnd-quote{margin-top:1.8rem;padding:1.2rem 1.4rem;border-left:2px solid var(--accent);background:rgba(82,183,255,.03)}
+.fnd-quote p{font-size:.88rem;color:var(--muted2);line-height:1.8;font-style:italic}
+.fnd-quote span{display:block;font-family:var(--mono);font-size:.58rem;color:var(--muted);margin-top:.6rem;letter-spacing:.1em}
+
+/* ── CONTACTO ── */
+#contacto{border-top:1px solid var(--border);text-align:center}
+.ctaw{max-width:660px;margin:0 auto}
+#contacto h2{margin-bottom:.9rem}
+.ct-sub{font-size:.93rem;color:var(--muted2);line-height:1.8;margin-bottom:2.5rem}
+.cfg{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin-top:2.5rem;text-align:left}
+.cf{display:flex;flex-direction:column;gap:.35rem}
+.cf label{font-family:var(--mono);font-size:.58rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+.cf input,.cf textarea,.cf select{background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:var(--sans);font-size:.86rem;padding:.7rem .9rem;outline:none;resize:none;transition:border-color .25s;-webkit-appearance:none}
+.cf input:focus,.cf textarea:focus,.cf select:focus{border-color:var(--accent)}
+.cf textarea{height:100px}
+.cf.full{grid-column:1/-1}
+.cf select option{background:var(--surface)}
+.sw{grid-column:1/-1;text-align:center;margin-top:.4rem}
+.bsub{font-family:var(--mono);font-size:.7rem;letter-spacing:.18em;text-transform:uppercase;color:var(--bg);background:var(--accent);padding:.82rem 2.8rem;border:none;cursor:pointer;transition:background .25s,transform .2s}
+.bsub:hover{background:var(--accent2);transform:translateY(-2px)}
+.snote{font-family:var(--mono);font-size:.58rem;color:var(--muted);letter-spacing:.1em;margin-top:.7rem}
+
+/* ── FOOTER ── */
+footer{padding:2.2rem 5%;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:relative;z-index:1;flex-wrap:wrap;gap:1rem}
+.fl{font-family:var(--mono);font-size:.8rem;letter-spacing:.14em;color:var(--muted)}.fl span{color:var(--accent)}
+.fc{font-family:var(--mono);font-size:.58rem;color:var(--muted);letter-spacing:.1em}
+.flinks{display:flex;gap:1.5rem}
+.flinks a{font-family:var(--mono);font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:color .25s}
+.flinks a:hover{color:var(--accent)}
+.fzoa{font-family:var(--mono);font-size:.58rem;color:var(--muted);letter-spacing:.1em;text-align:right}
+.fzoa span{color:var(--muted2)}
+
+/* ── REVEAL ── */
+.reveal{opacity:0;transform:translateY(26px);transition:opacity .75s ease,transform .75s ease}
+.reveal.visible{opacity:1;transform:translateY(0)}
+.rd1{transition-delay:.1s}.rd2{transition-delay:.2s}.rd3{transition-delay:.3s}.rd4{transition-delay:.4s}
+
+/* ── KEYFRAMES ── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+@keyframes scan{0%{top:-10%}50%{top:110%}100%{top:110%}}
+@keyframes scanH{0%{top:20%;opacity:0}10%{opacity:1}90%{opacity:1}100%{top:80%;opacity:0}}
+@keyframes ringPulse{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:1;transform:scale(1.03)}}
+
+/* ── RESPONSIVE ── */
+@media(max-width:1024px){
+  #quienes{grid-template-columns:1fr}
+  .mod-grid{grid-template-columns:1fr 1fr}
+  .qe-grid{grid-template-columns:1fr}
+  .prob-grid{grid-template-columns:1fr}
+  .fnd-grid{grid-template-columns:1fr}
+  .vt{grid-template-columns:1fr}
+  .rival-grid{grid-template-columns:1fr 1fr}
+  .rival-grid.two-col{grid-template-columns:1fr}
+  .pos-grid{grid-template-columns:repeat(3,1fr)}
+}
+@media(max-width:700px){
+  nav ul{display:none}.ncta{display:none}
+  .mod-grid{grid-template-columns:1fr}
+  .adv-grid{grid-template-columns:1fr}
+  .cfg{grid-template-columns:1fr}
+  .hspecs{gap:1.5rem}
+  section{padding:5rem 5%}
+  .face-deco{display:none}
+  footer{flex-direction:column;text-align:center}
+  .fzoa{text-align:center}
+  .rival-grid{grid-template-columns:1fr}
+  .pos-grid{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+
+<canvas id="cv"></canvas>
+
+<!-- ══ NAV ══ -->
+<nav id="nav">
+  <a href="#" class="logo">
+    <div class="lbox"><div class="lbox-scan"></div><span>Ag</span></div>
+    AGNITIO
+    <div class="lbeta">beta</div>
+  </a>
+  <ul>
+    <li><a href="#que-es">Sistema</a></li>
+    <li><a href="#modulos">Módulos</a></li>
+    <li><a href="#problema">Problema</a></li>
+    <li><a href="#competencia">Mercado</a></li>
+    <li><a href="#ventajas">Ventajas</a></li>
+    <li><a href="#founder">Fundador</a></li>
+  </ul>
+  <a href="#contacto" class="ncta">Contactar</a>
+</nav>
+
+<!-- ══ HERO ══ -->
+<header class="hero">
+  <div class="hgrid"></div>
+  <div class="hglow"></div>
+  <div class="hglow2"></div>
+
+  <div class="face-deco">
+    <div class="fd-ring"></div>
+    <div class="fd-ring"></div>
+    <div class="fd-ring"></div>
+    <div class="fd-corner fd-tl"></div>
+    <div class="fd-corner fd-tr"></div>
+    <div class="fd-corner fd-bl"></div>
+    <div class="fd-corner fd-br"></div>
+    <div class="fd-hline"></div>
+    <div class="fd-dot"></div>
+    <div class="fd-dot"></div>
+    <div class="fd-dot"></div>
+    <div class="fd-label">FACIAL_RECOGNITION · OFFLINE · EDGE</div>
+  </div>
+
+  <div class="hcontent">
+    <div class="hstatus"><span class="sdot"></span>Sistema en desarrollo activo · Raspberry Pi 5 · Edge AI</div>
+    <h1>
+      <span>Reconocimiento</span>
+      <span>facial</span>
+      <span class="h1-acc">sin nube.</span>
+    </h1>
+    <p class="hero-sub">
+      AGNITIO es un sistema de reconocimiento facial de próxima generación que opera 
+      <strong style="color:var(--text)">completamente offline</strong> — procesamiento en el dispositivo, 
+      sin latencia de red, sin dependencia de servidores externos. 
+      Seguridad real donde sea que se necesite.
+    </p>
+    <div class="hactions">
+      <a href="#modulos" class="btn-p">Ver módulos</a>
+      <a href="#que-es" class="btn-o">Cómo funciona</a>
+    </div>
+    <div class="hspecs">
+      <div class="spec"><div class="spec-val">&gt;70%</div><div class="spec-lbl">Eficacia en registro exprés</div></div>
+      <div class="spec"><div class="spec-val">&lt;60s</div><div class="spec-lbl">Alta de usuario nuevo</div></div>
+      <div class="spec"><div class="spec-val">100%</div><div class="spec-lbl">Procesamiento local</div></div>
+      <div class="spec"><div class="spec-val">3</div><div class="spec-lbl">Módulos de mercado</div></div>
+    </div>
+  </div>
+  <div class="hscroll">Scroll</div>
+</header>
+
+<!-- ══ QUIÉNES SOMOS ══ -->
+<section id="quienes">
+  <div class="qt">
+    <div class="stag reveal"><span class="snum">01 —</span>Quiénes somos</div>
+    <h2 class="sh reveal rd1">Tecnología de borde.<br><em>Seguridad sin límites.</em></h2>
+    <p class="reveal rd2">
+      AGNITIO es un proyecto de <strong>emprendimiento tecnológico deep-tech</strong> nacido en la 
+      Universidad Politécnica de Pachuca. Desarrollamos sistemas de visión artificial 
+      e inteligencia en el borde (edge AI) enfocados en seguridad, control de acceso e 
+      identificación de personas — sin depender de la nube para operar.
+    </p>
+    <p class="reveal rd3">
+      Llevamos más de <strong>dos años de desarrollo continuo</strong>, evolucionando desde un prototipo 
+      conceptual hasta un sistema funcional optimizado para hardware embebido. Somos 
+      un proyecto con presencia en plataformas de innovación como <strong>Expociencias</strong> 
+      y con proyección en iniciativas de impacto como <strong>Enactus México</strong>.
+    </p>
+    <div class="qt-badge reveal rd3">
+      <span>●</span> Parte del portafolio tecnológico ZOALUM Group
+    </div>
+  </div>
+
+  <div class="reveal rd2">
+    <div class="timeline">
+      <div class="tl-item">
+        <div class="tl-dot"></div>
+        <div class="tl-year">2022</div>
+        <div class="tl-body">
+          <div class="tl-title">Nace "VISION"</div>
+          <div class="tl-desc">Concepto original del sistema. Primeras pruebas de reconocimiento facial en hardware convencional.</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot"></div>
+        <div class="tl-year">2023</div>
+        <div class="tl-body">
+          <div class="tl-title">Evolución a AGNITIO</div>
+          <div class="tl-desc">Redefinición del nombre, identidad y arquitectura modular. Pivot hacia edge computing y operación offline.</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot"></div>
+        <div class="tl-year">2024</div>
+        <div class="tl-body">
+          <div class="tl-title">Optimización en Raspberry Pi 5</div>
+          <div class="tl-desc">Desarrollo de los tres módulos de mercado. Presentación en Expociencias. Evaluación para Enactus México.</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot"></div>
+        <div class="tl-year">2025+</div>
+        <div class="tl-body">
+          <div class="tl-title">Fase de escalamiento</div>
+          <div class="tl-desc">Integración con gafas inteligentes y unidad portátil de procesamiento. Primeras implementaciones institucionales.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ QUÉ ES ══ -->
+<section id="que-es">
+  <div class="stag reveal"><span class="snum">02 —</span>El sistema</div>
+  <h2 class="sh reveal rd1">Reconocimiento facial.<br><em>Edge. Offline. Rápido.</em></h2>
+
+  <div class="qe-grid">
+    <div class="qe-text">
+      <p class="reveal rd1">
+        En su núcleo, AGNITIO es un <strong>motor de reconocimiento facial</strong> diseñado para ejecutarse 
+        directamente en hardware de bajo consumo. Sin conexión a internet, sin envío de datos 
+        biométricos a servidores remotos, sin puntos de falla dependientes de la red.
+      </p>
+      <p class="reveal rd2">
+        La visión a largo plazo incluye su integración en <strong>gafas inteligentes</strong> conectadas a 
+        una unidad de procesamiento portátil — llevando la identificación facial a 
+        cualquier entorno, sin importar la infraestructura disponible.
+      </p>
+      <div class="feat-list">
+        <div class="feat-item reveal rd2">
+          <div class="feat-ico">◈</div>
+          <div class="feat-txt"><strong>Operación 100% offline</strong><span>Procesamiento local en el dispositivo. Sin latencia de red, sin dependencia de la nube para funcionar.</span></div>
+        </div>
+        <div class="feat-item reveal rd3">
+          <div class="feat-ico">◈</div>
+          <div class="feat-txt"><strong>Registro exprés en menos de 60s</strong><span>Alta y reconocimiento de un usuario nuevo en menos de un minuto con eficacia &gt;70%.</span></div>
+        </div>
+        <div class="feat-item reveal rd4">
+          <div class="feat-ico">◈</div>
+          <div class="feat-txt"><strong>Arquitectura modular</strong><span>Un mismo motor, tres adaptaciones para institucional, residencial e industrial.</span></div>
+        </div>
+        <div class="feat-item reveal rd4">
+          <div class="feat-ico">◈</div>
+          <div class="feat-txt"><strong>Seguridad de datos biométricos</strong><span>Los datos nunca salen del dispositivo. Privacidad garantizada por diseño, no por política.</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="reveal rd2">
+      <div class="hw-card">
+        <div class="hw-row"><span class="hw-key">plataforma</span><span class="hw-val">Raspberry Pi 5</span></div>
+        <div class="hw-row"><span class="hw-key">modo</span><span class="hw-val">Offline · Edge AI</span></div>
+        <div class="hw-row"><span class="hw-key">eficacia_reg_exprés</span><span class="hw-val">&gt; 70%</span></div>
+        <div class="hw-row"><span class="hw-key">tiempo_alta_usuario</span><span class="hw-val">&lt; 60 segundos</span></div>
+        <div class="hw-row"><span class="hw-key">almacenamiento_datos</span><span class="hw-val">Local · Encriptado</span></div>
+        <div class="hw-row"><span class="hw-key">red_requerida</span><span class="hw-val">No (opcional)</span></div>
+        <div class="hw-row"><span class="hw-key">módulos</span><span class="hw-val">ORACLES · HOME · INDUSTRIES</span></div>
+        <div class="hw-row"><span class="hw-key">forma_factor_objetivo</span><span class="hw-val">Gafas + unidad portátil</span></div>
+        <div class="hw-row"><span class="hw-key">estado</span><span class="hw-val hi">En desarrollo activo</span></div>
+        <div class="hw-badge">Optimizado para hardware embebido</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ MÓDULOS ══ -->
+<section id="modulos">
+  <div class="mod-header">
+    <div class="stag reveal"><span class="snum">03 —</span>Módulos</div>
+    <h2 class="sh reveal rd1">Un motor.<br><em>Tres mercados.</em></h2>
+    <p class="reveal rd2">AGNITIO se adapta a distintos contextos de uso gracias a su arquitectura modular. El motor de reconocimiento es el mismo — la aplicación cambia según el entorno y la necesidad.</p>
+  </div>
+
+  <div class="mod-grid">
+    <div class="mod-card mc-oracle reveal">
+      <div class="mod-bar"></div>
+      <div class="mod-tag">ORACLES</div>
+      <svg class="mod-icon" viewBox="0 0 48 48" fill="none">
+        <rect x="8" y="6" width="32" height="36" rx="2" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M16 16h16M16 22h10M16 28h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="34" cy="34" r="8" fill="var(--bg)" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M31 34l2 2 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div class="mod-title">Seguridad Institucional</div>
+      <div class="mod-subtitle">Escuelas · Corporativos · Gobierno</div>
+      <p class="mod-body">Sistema de control de acceso, asistencia y monitoreo de seguridad para instituciones. Registra quién entra, cuándo, y genera reportes automáticos — sin depender de tarjetas ni PINs que se pierden u olvidan.</p>
+      <div class="mod-caps">
+        <div class="mcap">Control de acceso por reconocimiento</div>
+        <div class="mcap">Registro automático de asistencia</div>
+        <div class="mcap">Alertas de personas no autorizadas</div>
+        <div class="mcap">Reportes y bitácora de accesos</div>
+      </div>
+    </div>
+
+    <div class="mod-card mc-home reveal rd1">
+      <div class="mod-bar"></div>
+      <div class="mod-tag">HOME</div>
+      <svg class="mod-icon" viewBox="0 0 48 48" fill="none">
+        <path d="M8 22L24 8l16 14v18a2 2 0 01-2 2H10a2 2 0 01-2-2V22z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+        <rect x="18" y="28" width="12" height="14" rx="1" stroke="currentColor" stroke-width="1.5"/>
+        <circle cx="33" cy="18" r="7" fill="var(--bg)" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M30.5 18l2 2 3.5-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div class="mod-title">Seguridad Residencial</div>
+      <div class="mod-subtitle">Hogares · Condominios · Acceso privado</div>
+      <p class="mod-body">Acceso inteligente al hogar mediante reconocimiento facial. Abre puertas, registra visitantes y notifica a los propietarios — sin llaves que se copian y sin códigos que se comparten.</p>
+      <div class="mod-caps">
+        <div class="mcap">Apertura de acceso por rostro</div>
+        <div class="mcap">Registro de visitantes conocidos</div>
+        <div class="mcap">Alertas de personas desconocidas</div>
+        <div class="mcap">Historial de accesos del hogar</div>
+      </div>
+    </div>
+
+    <div class="mod-card mc-vision reveal rd2">
+      <div class="mod-bar"></div>
+      <div class="mod-tag">INDUSTRIES</div>
+      <svg class="mod-icon" viewBox="0 0 48 48" fill="none">
+        <rect x="6" y="28" width="8" height="14" rx="1" stroke="currentColor" stroke-width="1.5"/>
+        <rect x="20" y="20" width="8" height="22" rx="1" stroke="currentColor" stroke-width="1.5"/>
+        <rect x="34" y="14" width="8" height="28" rx="1" stroke="currentColor" stroke-width="1.5"/>
+        <circle cx="24" cy="12" r="6" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M21 12l2 2 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div class="mod-title">Seguridad Industrial</div>
+      <div class="mod-subtitle">Plantas · Manufactura · EPP Compliance</div>
+      <p class="mod-body">Más allá del acceso: AGNITIO Industries detecta si el personal lleva el Equipo de Protección Personal correcto antes de ingresar a zonas de riesgo. Prevención de accidentes y cumplimiento normativo automatizado.</p>
+      <div class="mod-caps">
+        <div class="mcap">Reconocimiento de identidad del personal</div>
+        <div class="mcap">Detección de uso correcto de EPP</div>
+        <div class="mcap">Bloqueo de acceso sin equipo requerido</div>
+        <div class="mcap">Reportes de cumplimiento normativo</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ EL PROBLEMA ══ -->
+<section id="problema">
+  <div class="prob-grid">
+    <div class="prob-left">
+      <div class="stag reveal"><span class="snum">04 —</span>El problema</div>
+      <h2 class="sh reveal rd1">Los sistemas actuales<br><span class="strk">tienen un talón de Aquiles.</span></h2>
+      <p class="reveal rd2">Los sistemas de seguridad y control de acceso del mercado fueron diseñados para un mundo con conexión constante, servidores disponibles y presupuestos corporativos. La realidad es muy diferente.</p>
+      <div class="pain-list">
+        <div class="pain-item reveal">
+          <div class="xico">✗</div>
+          <div class="ptxt"><strong>Dependencia total de internet.</strong> Si cae la red, cae el sistema. Sin conectividad no hay acceso, no hay registro, no hay seguridad.</div>
+        </div>
+        <div class="pain-item reveal rd1">
+          <div class="xico">✗</div>
+          <div class="ptxt"><strong>Datos biométricos en la nube.</strong> Tu rostro — el dato más personal que existe — se almacena en servidores de terceros fuera de tu control.</div>
+        </div>
+        <div class="pain-item reveal rd2">
+          <div class="xico">✗</div>
+          <div class="ptxt"><strong>Costos prohibitivos.</strong> Las soluciones empresariales de reconocimiento facial son inaccesibles para escuelas, pymes o proyectos industriales medianos.</div>
+        </div>
+        <div class="pain-item reveal rd3">
+          <div class="xico">✗</div>
+          <div class="ptxt"><strong>Cero detección de EPP.</strong> Ningún sistema asequible integra la verificación del equipo de protección — uno de los mayores causantes de accidentes industriales.</div>
+        </div>
+        <div class="pain-item reveal rd3">
+          <div class="xico">✗</div>
+          <div class="ptxt"><strong>Alta de usuarios lenta y engorrosa.</strong> Registrar una persona nueva en sistemas convencionales puede tomar horas o días de configuración.</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="stag reveal" style="visibility:hidden">–</div>
+      <h2 class="sh reveal rd1" style="margin-bottom:1.8rem">AGNITIO lo<br><em>resuelve así.</em></h2>
+      <div class="sol-block reveal rd1">
+        <div class="sol-lbl">Edge AI — Sin nube requerida</div>
+        <p class="sol-txt">Todo el procesamiento ocurre en el dispositivo local. <strong>La red es opcional, nunca obligatoria.</strong> El sistema funciona en zonas sin señal, sin internet, sin infraestructura.</p>
+      </div>
+      <div class="sol-block reveal rd2">
+        <div class="sol-lbl">Privacidad por diseño</div>
+        <p class="sol-txt"><strong>Los datos biométricos nunca salen del hardware.</strong> No hay transmisión a servidores externos. La soberanía sobre los datos permanece donde debe: en el usuario y la institución.</p>
+      </div>
+      <div class="sol-block reveal rd3">
+        <div class="sol-lbl">Hardware accesible — Raspberry Pi 5</div>
+        <p class="sol-txt">Optimizado para correr en <strong>hardware de bajo costo</strong>. Sin servidores caros, sin licencias por usuario, sin infraestructura cloud. El costo de entrada es una fracción del mercado.</p>
+      </div>
+      <div class="sol-block reveal rd4">
+        <div class="sol-lbl">Registro exprés en &lt; 60 segundos</div>
+        <p class="sol-txt"><strong>Alta y reconocimiento de un usuario nuevo en menos de un minuto.</strong> Un flujo diseñado para el mundo real: veloz, simple y funcional desde el primer día.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ COMPETENCIA (REDISEÑADA) ══ -->
+<section id="competencia">
+  <div class="comp-header">
+    <div class="stag reveal"><span class="snum">05 —</span>El mercado</div>
+    <h2 class="sh reveal rd1">El paisaje<br><em>competitivo.</em></h2>
+    <p class="reveal rd2">El mercado de reconocimiento facial está dominado por gigantes con millones en infraestructura, y un referente nacional emergiendo en nuestro propio patio. Aquí está el análisis honesto — y dónde AGNITIO se posiciona.</p>
+  </div>
+
+  <!-- BLOQUE 1: Gigantes globales de hardware -->
+  <div class="comp-section-label reveal">Gigantes globales · Cámaras con IA embebida</div>
+  <div class="rival-grid reveal rd1">
+
+    <!-- Hikvision -->
+    <div class="rival-card origin-cn">
+      <div class="rbar"></div>
+      <div class="rival-head">
+        <div>
+          <div class="rival-name">Hikvision</div>
+          <div class="rival-tagline">Líder mundial en volumen · Deep Learning accesible</div>
+        </div>
+        <div class="rival-origin">China</div>
+      </div>
+      <p class="rival-desc">El líder mundial indiscutible en volumen. Su fuerte es la democratización de la IA: pusieron reconocimiento facial y detección de comportamiento en cámaras de bajo costo. Para AGNITIO, son el rival a vencer en costo-beneficio.</p>
+      <div class="rival-attrs">
+        <div class="rattr strong"><span class="rattr-icon">+</span>Reconocimiento facial en hardware accesible a escala masiva</div>
+        <div class="rattr strong"><span class="rattr-icon">+</span>Red de distribución global consolidada</div>
+        <div class="rattr weak"><span class="rattr-icon">−</span>Dependencia de nube para funciones avanzadas de análisis</div>
+        <div class="rattr weak"><span class="rattr-icon">−</span>Cuestionamientos serios de ciberseguridad y privacidad de datos</div>
+        <div class="rattr weak"><span class="rattr-icon">−</span>Sin detección de EPP ni módulos industriales especializados</div>
+      </div>
+    </div>
+
+    <!-- Dahua -->
+    <div class="rival-card origin-cn">
+      <div class="rbar"></div>
+      <div class="rival-head">
+        <div>
+          <div class="rival-name">Dahua Technology</div>
+          <div class="rival-tagline">Deep Learning aplicado · Búsqueda por metadatos</div>
+        </div>
+        <div class="rival-origin">China</div>
+      </div>
+      <p class="rival-desc">El eterno competidor de Hikvision. Destacan por algoritmos de Deep Learning aplicados a búsqueda de metadatos: localizar a alguien por el color de su ropa, si lleva mochila, o por atributos físicos sin necesidad de reconocimiento facial previo.</p>
+      <div class="rival-attrs">
+        <div class="rattr strong"><span class="rattr-icon">+</span>Búsqueda avanzada por metadatos y atributos visuales</div>
+        <div class="rattr strong"><span class="rattr-icon">+</span>Ecosistema completo de cámaras con IA integrada</div>
+        <div class="rattr weak"><span class="rattr-icon">−</span>Mismas restricciones de privacidad y dependencia de nube que Hikvision</div>
+        <div class="rattr weak"><span class="rattr-icon">−</span>Fuera del alcance presupuestal de PyMEs y escuelas</div>
+        <div class="rattr weak"><span class="rattr-icon">−</span>Sin enfoque en EPP compliance ni seguridad industrial específica</div>
+      </div>
+    </div>
+
+    <!-- Hanwha Vision -->
+    <div class="rival-card origin-kr">
+      <div class="rbar"></div>
+      <div class="rival-head">
+        <div>
+          <div class="rival-name">Hanwha Vision</div>
+          <div class="rival-tagline">Ex-Samsung Techwin · Alternativa segura frente a China</div>
+        </div>
+        <div class="rival-origin">Corea del Sur</div>
+      </div>
+      <p class="rival-desc">Antes conocida como Samsung Techwin. Se posicionaron como la alternativa "segura" y de alta calidad frente a marcas chinas — especialmente en sectores que exigen certificaciones estrictas de ciberseguridad como el cumplimiento de la norma NDAA de EE.UU.</p>
+      <div class="rival-attrs">
+        <div class="rattr strong"><span class="rattr-icon">+</span>Certificación NDAA: preferida por gobierno y sectores regulados en EE.UU.</div>
+        <div class="rattr strong"><span class="rattr-icon">+</span>Alta calidad óptica y algoritmos de visión maduros</div>
+        <div class="rattr neutral"><span class="rattr-icon">~</span>Precio premium: posicionada en el segmento enterprise</div>
+        <div class="rattr weak"><span class="rattr-icon">−</span>Sin presencia estratégica significativa en México y LATAM</div>
+        <div class="rattr weak"><span class="rattr-icon">−</span>Sin detección de EPP ni módulos de seguridad industrial</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BLOQUE 2: Referente nacional -->
+  <div class="comp-section-label reveal" style="margin-top:3rem">Referente nacional · Plataforma gubernamental en México</div>
+  <div class="rival-grid two-col reveal rd1">
+
+    <!-- Nexus -->
+    <div class="rival-card nexus-card origin-mx">
+      <div class="rbar"></div>
+      <div class="nexus-badge">Activo en Estado de México · Mundial 2026</div>
+      <div class="rival-head">
+        <div>
+          <div class="rival-name">Nexus</div>
+          <div class="rival-tagline">Plataforma biométrica gubernamental · Seguridad pública masiva</div>
+        </div>
+        <div class="rival-origin">México</div>
+      </div>
+      <p class="rival-desc">Más que una marca de cámaras: Nexus es el nombre del sistema de inteligencia y plataforma biométrica desplegado con fuerza en el Estado de México — especialmente en el marco del Mundial 2026. Integra reconocimiento facial en tiempo real, rastreo de placas (LPR) e identificación de sospechosos mediante dispositivos móviles y cámaras fijas conectadas a bases de datos institucionales.</p>
+      <div class="rival-attrs">
+        <div class="rattr strong"><span class="rattr-icon">+</span>Reconocimiento facial en tiempo real integrado con bases de datos del Estado</div>
+        <div class="rattr strong"><span class="rattr-icon">+</span>Rastreo LPR y búsqueda móvil de personas de interés</div>
+        <div class="rattr strong"><span class="rattr-icon">+</span>Modelo de referencia para seguridad gubernamental en México</div>
+        <div class="rattr weak"><span class="rattr-icon">−</span>Diseñado para seguridad pública, no para control de acceso corporativo o EPP</div>
+        <div class="rattr weak"><span class="rattr-icon">−</span>Requiere infraestructura gubernamental: inaccesible para escuelas o industrias medianas</div>
+        <div class="rattr neutral"><span class="rattr-icon">~</span>Competencia directa si AGNITIO escala a plataforma de gestión de alertas institucional</div>
+      </div>
+    </div>
+
+    <!-- Contexto estratégico -->
+    <div class="rival-card origin-us" style="background:rgba(255,159,28,.025)">
+      <div class="rbar" style="background:linear-gradient(90deg,var(--accent),transparent)"></div>
+      <div class="rival-head">
+        <div>
+          <div class="rival-name" style="color:var(--accent)">Amazon / Azure Face API</div>
+          <div class="rival-tagline">Cloud puro · Enterprise · Pay-per-use</div>
+        </div>
+        <div class="rival-origin" style="color:var(--warn);border-color:rgba(255,159,28,.3)">Cloud</div>
+      </div>
+      <p class="rival-desc">Amazon Rekognition y Microsoft Azure Face dominan el espacio cloud. Son potentes, escalables y bien documentadas — pero estructuralmente dependientes de internet, con datos biométricos en servidores externos y precios que escalan con el uso.</p>
+      <div class="rival-attrs">
+        <div class="rattr strong"><span class="rattr-icon">+</span>Precisión y escala: entrena con miles de millones de imágenes</div>
+        <div class="rattr strong"><span class="rattr-icon">+</span>Ecosistema de APIs maduro y bien documentado</div>
+        <div class="rattr weak"><span class="rattr-icon">−</span>100% cloud: cero operación sin internet</div>
+        <div class="rattr weak"><span class="rattr-icon">−</span>Datos biométricos en servidores de terceros en el extranjero</div>
+        <div class="rattr weak"><span class="rattr-icon">−</span>Costo variable impredecible para usuarios de volumen bajo-medio</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mapa de posicionamiento -->
+  <div class="agnitio-pos-card reveal" style="margin-top:3.5rem">
+    <div class="pos-grid">
+      <div class="pos-col">
+        <div class="pos-col-head">Operación<br>Offline</div>
+        <div class="pos-dot full">✓</div><div class="pos-row-label">AGNITIO</div><br><br>
+        <div class="pos-dot full" style="margin-top:1rem">✓</div><div class="pos-row-label">Hikvision*</div><br><br>
+        <div class="pos-dot none" style="margin-top:1rem">✗</div><div class="pos-row-label">AWS/Azure</div><br><br>
+        <div class="pos-dot none" style="margin-top:1rem">✗</div><div class="pos-row-label">Nexus</div>
+      </div>
+      <div class="pos-col">
+        <div class="pos-col-head">Privacidad<br>Local</div>
+        <div class="pos-dot full">✓</div><div class="pos-row-label">AGNITIO</div><br><br>
+        <div class="pos-dot none" style="margin-top:1rem">✗</div><div class="pos-row-label">Hikvision</div><br><br>
+        <div class="pos-dot none" style="margin-top:1rem">✗</div><div class="pos-row-label">AWS/Azure</div><br><br>
+        <div class="pos-dot none" style="margin-top:1rem">✗</div><div class="pos-row-label">Nexus</div>
+      </div>
+      <div class="pos-col">
+        <div class="pos-col-head">Detección<br>de EPP</div>
+        <div class="pos-dot full">✓</div><div class="pos-row-label">AGNITIO</div><br><br>
+        <div class="pos-dot none" style="margin-top:1rem">✗</div><div class="pos-row-label">Hikvision</div><br><br>
+        <div class="pos-dot none" style="margin-top:1rem">✗</div><div class="pos-row-label">Dahua</div><br><br>
+        <div class="pos-dot none" style="margin-top:1rem">✗</div><div class="pos-row-label">Nexus</div>
+      </div>
+      <div class="pos-col">
+        <div class="pos-col-head">Registro<br>&lt; 60s</div>
+        <div class="pos-dot full">✓</div><div class="pos-row-label">AGNITIO</div><br><br>
+        <div class="pos-dot half" style="margin-top:1rem">~</div><div class="pos-row-label">Hikvision</div><br><br>
+        <div class="pos-dot half" style="margin-top:1rem">~</div><div class="pos-row-label">AWS/Azure</div><br><br>
+        <div class="pos-dot none" style="margin-top:1rem">✗</div><div class="pos-row-label">Biométricos</div>
+      </div>
+      <div class="pos-col">
+        <div class="pos-col-head">Costo<br>Accesible</div>
+        <div class="pos-dot full">✓</div><div class="pos-row-label">AGNITIO</div><br><br>
+        <div class="pos-dot half" style="margin-top:1rem">~</div><div class="pos-row-label">Hikvision</div><br><br>
+        <div class="pos-dot none" style="margin-top:1rem">✗</div><div class="pos-row-label">Hanwha</div><br><br>
+        <div class="pos-dot none" style="margin-top:1rem">✗</div><div class="pos-row-label">Nexus</div>
+      </div>
+    </div>
+    <div style="margin-top:1.2rem;font-family:var(--mono);font-size:.58rem;color:var(--muted);letter-spacing:.08em">* Hikvision opera offline a nivel de cámara, pero sus funciones avanzadas de análisis y gestión dependen de nube propia o servidores locales de alto costo.</div>
+  </div>
+
+  <!-- Tabla clásica -->
+  <div class="tw reveal">
+    <div class="tw-label">Comparativa rápida · Características clave</div>
+    <table class="ct">
+      <thead>
+        <tr>
+          <th>Solución</th>
+          <th>Offline / Edge</th>
+          <th>Privacidad local</th>
+          <th>Detección EPP</th>
+          <th>Registro exprés</th>
+          <th>Costo accesible</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="us">
+          <td>⬡ AGNITIO</td>
+          <td><span class="ck">✓ Nativo</span></td>
+          <td><span class="ck">✓ 100% local</span></td>
+          <td><span class="ck">✓ Industries</span></td>
+          <td><span class="ck">✓ &lt; 60s</span></td>
+          <td><span class="ck">✓ Raspberry Pi</span></td>
+        </tr>
+        <tr>
+          <td>Hikvision</td>
+          <td><span class="pp">~ Parcial</span></td>
+          <td><span class="xx">✗ China servers</span></td>
+          <td><span class="xx">✗ No</span></td>
+          <td><span class="pp">~ Variable</span></td>
+          <td><span class="pp">~ Medio</span></td>
+        </tr>
+        <tr>
+          <td>Dahua Technology</td>
+          <td><span class="pp">~ Parcial</span></td>
+          <td><span class="xx">✗ China servers</span></td>
+          <td><span class="xx">✗ No</span></td>
+          <td><span class="pp">~ Variable</span></td>
+          <td><span class="pp">~ Medio</span></td>
+        </tr>
+        <tr>
+          <td>Hanwha Vision</td>
+          <td><span class="ck">✓ Sí</span></td>
+          <td><span class="ck">✓ Local</span></td>
+          <td><span class="xx">✗ No</span></td>
+          <td><span class="pp">~ Variable</span></td>
+          <td><span class="xx">✗ Enterprise</span></td>
+        </tr>
+        <tr>
+          <td>Nexus (México)</td>
+          <td><span class="xx">✗ Red requerida</span></td>
+          <td><span class="xx">✗ Gubernamental</span></td>
+          <td><span class="xx">✗ No</span></td>
+          <td><span class="pp">~ Variable</span></td>
+          <td><span class="xx">✗ Gov only</span></td>
+        </tr>
+        <tr>
+          <td>Amazon Rekognition</td>
+          <td><span class="xx">✗ Cloud only</span></td>
+          <td><span class="xx">✗ AWS servers</span></td>
+          <td><span class="xx">✗ No</span></td>
+          <td><span class="pp">~ Variable</span></td>
+          <td><span class="xx">✗ Pay-per-use</span></td>
+        </tr>
+        <tr>
+          <td>Microsoft Azure Face</td>
+          <td><span class="xx">✗ Cloud only</span></td>
+          <td><span class="xx">✗ Azure servers</span></td>
+          <td><span class="xx">✗ No</span></td>
+          <td><span class="pp">~ Variable</span></td>
+          <td><span class="xx">✗ Enterprise</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══ VENTAJAS ══ -->
+<section id="ventajas">
+  <div class="vt">
+    <div>
+      <div class="stag reveal"><span class="snum">06 —</span>Nuestras ventajas</div>
+      <h2 class="sh reveal rd1">Por qué AGNITIO<br><em>gana.</em></h2>
+    </div>
+    <p class="reveal rd2">No somos un sistema genérico adaptado. Fuimos diseñados desde cero para operar en el borde, sin nube, con hardware accesible y pensando en los mercados que el enterprise ignora.</p>
+  </div>
+  <div class="adv-grid">
+    <div class="adv reveal">
+      <div class="adv-bar"></div>
+      <div class="adv-n">01</div>
+      <div class="adv-t">El único con detección de EPP integrada</div>
+      <p class="adv-b">Ningún competidor accesible — ni Hikvision, ni Dahua, ni Nexus — verifica el equipo de protección personal. AGNITIO Industries hace esto de forma automática antes de permitir el acceso a zonas de riesgo.</p>
+    </div>
+    <div class="adv reveal rd1">
+      <div class="adv-bar"></div>
+      <div class="adv-n">02</div>
+      <div class="adv-t">Offline por diseño, no como parche</div>
+      <p class="adv-b">Hikvision y Dahua procesan localmente a nivel de cámara, pero sus funciones de análisis avanzado dependen de infraestructura de red. AGNITIO opera sin red desde el primer registro hasta el último acceso.</p>
+    </div>
+    <div class="adv reveal rd2">
+      <div class="adv-bar"></div>
+      <div class="adv-n">03</div>
+      <div class="adv-t">Hardware accesible para mercados reales</div>
+      <p class="adv-b">Corre en Raspberry Pi 5. Frente al costo de equipos Hikvision enterprise o infraestructura Nexus gubernamental, AGNITIO es la opción que escuelas, industrias medianas y condominios pueden adoptar hoy.</p>
+    </div>
+    <div class="adv reveal rd3">
+      <div class="adv-bar"></div>
+      <div class="adv-n">04</div>
+      <div class="adv-t">Privacidad estructural, no promesas</div>
+      <p class="adv-b">Hikvision y Dahua han sido señaladas en múltiples países por sus implicaciones de ciberseguridad. Con AGNITIO, los datos biométricos no pueden salir del dispositivo — por diseño de arquitectura, no por contrato.</p>
+    </div>
+    <div class="adv reveal rd1">
+      <div class="adv-bar"></div>
+      <div class="adv-n">05</div>
+      <div class="adv-t">Arquitectura que se adapta al contexto</div>
+      <p class="adv-b">Tres módulos, un motor. La misma tecnología se configura para institucional, residencial o industrial — sin reinventar el sistema para cada mercado ni depender de ecosistemas de cámara propietarios.</p>
+    </div>
+    <div class="adv reveal rd2">
+      <div class="adv-bar"></div>
+      <div class="adv-n">06</div>
+      <div class="adv-t">Proximidad a Nexus: alianza, no solo rivalidad</div>
+      <p class="adv-b">Con Nexus desplegándose en Estado de México para el Mundial 2026, existe una oportunidad real de posicionarse como software complementario que corre sobre infraestructura existente — o de diferenciarse como alternativa para el sector privado y educativo que Nexus no atiende.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ FUNDADOR ══ -->
+<section id="founder">
+  <div class="fnd-grid">
+    <div class="fnd-left">
+      <div class="stag reveal"><span class="snum">07 —</span>El fundador</div>
+      <h2 class="sh reveal rd1">Construido por<br><em>quien lo necesitaba.</em></h2>
+      <p class="reveal rd2">
+        AGNITIO es liderado por <strong>Abner Alejandro Díaz Martínez</strong>, estudiante de quinto semestre 
+        de Ingeniería Mecatrónica en la Universidad Politécnica de Pachuca. Con 20 años y más de 
+        dos años de desarrollo continuo, Abner combina la ingeniería de sistemas embebidos con 
+        una visión clara de emprendimiento tecnológico.
+      </p>
+      <p class="reveal rd3">
+        AGNITIO no nació en un laboratorio corporativo. Nació de la observación directa de un 
+        problema real: <strong>los sistemas de seguridad existentes no funcionan para la mayoría de 
+        las organizaciones</strong> que más los necesitan. Esa claridad sigue siendo el motor del proyecto.
+      </p>
+      <div class="fnd-tags reveal rd3">
+        <span class="ftag">Mecatrónica</span>
+        <span class="ftag">Edge AI</span>
+        <span class="ftag">Computer Vision</span>
+        <span class="ftag">Raspberry Pi</span>
+        <span class="ftag">Emprendimiento</span>
+        <span class="ftag">ZOALUM Group</span>
+      </div>
+    </div>
+
+    <div class="reveal rd2">
+      <div class="fnd-card">
+        <div class="fp-row"><span class="fp-k">nombre</span><span class="fp-v">Abner A. Díaz Martínez</span></div>
+        <div class="fp-row"><span class="fp-k">edad</span><span class="fp-v">20 años</span></div>
+        <div class="fp-row"><span class="fp-k">carrera</span><span class="fp-v">Ing. Mecatrónica · 5° semestre</span></div>
+        <div class="fp-row"><span class="fp-k">universidad</span><span class="fp-v">Univ. Politécnica de Pachuca</span></div>
+        <div class="fp-row"><span class="fp-k">desarrollo_activo</span><span class="fp-v"><span class="hi">+2 años continuos</span></span></div>
+        <div class="fp-row"><span class="fp-k">nombre_original</span><span class="fp-v">VISION → AGNITIO</span></div>
+        <div class="fp-row"><span class="fp-k">plataformas</span><span class="fp-v">Expociencias · Enactus México</span></div>
+        <div class="fp-row"><span class="fp-k">holding</span><span class="fp-v">ZOALUM Group</span></div>
+        <div class="fp-row"><span class="fp-k">estado</span><span class="fp-v"><span class="hi">En desarrollo activo</span></span></div>
+      </div>
+      <div class="fnd-quote">
+        <p>"El conocimiento sin aplicación es solo teoría. AGNITIO existe para que la tecnología de reconocimiento facial sea tan accesible como necesaria."</p>
+        <span>— Abner A. Díaz Martínez · Fundador, AGNITIO</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ CONTACTO ══ -->
+<section id="contacto">
+  <div class="ctaw">
+    <div class="stag reveal" style="justify-content:center"><span class="snum">08 —</span>Contacto</div>
+    <h2 class="sh reveal rd1">¿Interesado en<br><em>AGNITIO?</em></h2>
+    <p class="ct-sub reveal rd2">¿Eres una institución, empresa o investigador interesado en colaborar, implementar o conocer más? Escríbenos. Estamos en fase de desarrollo y buscamos aliados estratégicos.</p>
+    <form class="cfg reveal rd2" onsubmit="handleSend(event)">
+      <div class="cf"><label>Nombre</label><input type="text" placeholder="Tu nombre completo"/></div>
+      <div class="cf"><label>Organización</label><input type="text" placeholder="Empresa o institución"/></div>
+      <div class="cf"><label>Correo electrónico</label><input type="email" placeholder="correo@org.com"/></div>
+      <div class="cf">
+        <label>Módulo de interés</label>
+        <select>
+          <option value="" disabled selected>Selecciona un módulo</option>
+          <option>ORACLES — Seguridad Institucional</option>
+          <option>HOME — Seguridad Residencial</option>
+          <option>INDUSTRIES — Seguridad Industrial + EPP</option>
+          <option>Alianza estratégica / Inversión</option>
+          <option>Colaboración académica</option>
+          <option>Otro / Más información</option>
+        </select>
+      </div>
+      <div class="cf full"><label>Mensaje</label><textarea placeholder="Cuéntanos tu caso de uso, contexto o cómo te gustaría colaborar con AGNITIO..."></textarea></div>
+      <div class="sw">
+        <button type="submit" class="bsub" id="sbtn">Enviar mensaje</button>
+        <div class="snote">Respondemos en menos de 24 horas · Proyecto en desarrollo activo</div>
+      </div>
+    </form>
+  </div>
+</section>
+
+<!-- ══ FOOTER ══ -->
+<footer>
+  <div class="fl"><span>AGN</span>ITIO</div>
+  <div class="fc">© 2026 AGNITIO — Todos los derechos reservados</div>
+  <div class="flinks">
+    <a href="#">Privacidad</a>
+    <a href="#">Términos</a>
+    <a href="#founder">Fundador</a>
+  </div>
+  <div class="fzoa">Portafolio <span>ZOALUM Group</span></div>
+</footer>
+
+<script>
+/* NAV */
+const nav = document.getElementById('nav');
+window.addEventListener('scroll', () => nav.classList.toggle('on', window.scrollY > 60));
+
+/* REVEAL */
+const revs = document.querySelectorAll('.reveal');
+const obs = new IntersectionObserver(es => es.forEach(e => {
+  if(e.isIntersecting){e.target.classList.add('visible');obs.unobserve(e.target);}
+}), {threshold:.08});
+revs.forEach(el => obs.observe(el));
+
+/* CANVAS — particle network */
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+let W, H, nodes = [];
+
+function resize(){ W = cv.width = window.innerWidth; H = cv.height = window.innerHeight; }
+resize(); window.addEventListener('resize', resize);
+
+class Node {
+  constructor(){
+    this.x  = Math.random()*W; this.y  = Math.random()*H;
+    this.vx = (Math.random()-.5)*.3; this.vy = (Math.random()-.5)*.3;
+    this.r  = Math.random()*1.4+.4; this.a  = Math.random()*.8+.2;
+  }
+  update(){
+    this.x+=this.vx; this.y+=this.vy;
+    if(this.x<0||this.x>W) this.vx*=-1;
+    if(this.y<0||this.y>H) this.vy*=-1;
+  }
+}
+
+const N = Math.min(80, Math.floor(W*H/15000));
+for(let i=0;i<N;i++) nodes.push(new Node());
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  for(let i=0;i<nodes.length;i++){
+    for(let j=i+1;j<nodes.length;j++){
+      const dx=nodes[i].x-nodes[j].x, dy=nodes[i].y-nodes[j].y;
+      const d=Math.sqrt(dx*dx+dy*dy);
+      if(d<130){
+        ctx.beginPath();
+        ctx.strokeStyle=`rgba(82,183,255,${(1-d/130)*.3})`;
+        ctx.lineWidth=.5;
+        ctx.moveTo(nodes[i].x,nodes[i].y);
+        ctx.lineTo(nodes[j].x,nodes[j].y);
+        ctx.stroke();
+      }
+    }
+  }
+  nodes.forEach(n=>{
+    ctx.beginPath();
+    ctx.arc(n.x,n.y,n.r,0,Math.PI*2);
+    ctx.fillStyle=`rgba(82,183,255,${n.a*.65})`;
+    ctx.fill();
+    n.update();
+  });
+  requestAnimationFrame(draw);
+}
+draw();
+
+/* FORM */
+function handleSend(e){
+  e.preventDefault();
+  const b = document.getElementById('sbtn');
+  b.textContent='✓ Mensaje enviado';
+  b.style.background='var(--accent2)';
+  b.disabled=true;
+}
+</script>
+</body>
+</html>
